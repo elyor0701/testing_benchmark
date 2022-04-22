@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/mailru/easyjson"
@@ -22,27 +24,24 @@ type UserFace struct {
 // вам надо написать более быструю оптимальную этой функции
 func FastSearch(out io.Writer) {
 	file, err := os.Open(filePath)
+	sc := bufio.NewScanner(file)
 	if err != nil {
 		panic(err)
 	}
 
-	fileContents, err := ioutil.ReadAll(file)
-	if err != nil {
-		panic(err)
-	}
+	sc.Split(bufio.ScanLines)
 
-	//	r := regexp.MustCompile("@")
 	seenBrowsers := []string{}
 	uniqueBrowsers := 0
-	foundUsers := ""
 
-	lines := strings.Split(string(fileContents), "\n")
+	buf := bytes.Buffer{}
+
 	//easyjson:json
 	users := make([]UserFace, 0)
-	for _, line := range lines {
+	for sc.Scan() {
 		user := &UserFace{}
-		// fmt.Printf("%v %v\n", err, line)
-		err := user.UnmarshalJSON([]byte(line))
+
+		err = user.UnmarshalJSON(sc.Bytes())
 		if err != nil {
 			panic(err)
 		}
@@ -100,10 +99,18 @@ func FastSearch(out io.Writer) {
 
 		// log.Println("Android and MSIE user:", user["name"], user["email"])
 		email := strings.Replace(user.Email, "@", " [at] ", -1)
-		foundUsers += fmt.Sprintf("[%d] %s <%s>\n", i, user.Name, email)
+
+		buf.WriteByte('[')
+		buf.WriteString(strconv.Itoa(i))
+		buf.WriteString("] ")
+		buf.WriteString(user.Name)
+		buf.WriteString(" <")
+		buf.WriteString(email)
+		buf.WriteString(">\n")
+
 	}
 
-	fmt.Fprintln(out, "found users:\n"+foundUsers)
+	fmt.Fprintln(out, "found users:\n"+buf.String())
 	fmt.Fprintln(out, "Total unique browsers", len(seenBrowsers))
 }
 
